@@ -43,13 +43,14 @@ def calculate_correlation_matrix(df):
     correlation_matrix = df[variables].corr()
     return correlation_matrix
 
-def create_excel_style_heatmap(corr_matrix, filename='heatmap.png', size=(500, 500)):
+def create_excel_style_heatmap(corr_matrix, filename='heatmap.png', size=(400, 400)):
     """Create Excel-style heatmap with Red-White-Green color scheme"""
     
-    # Create figure with specific size
-    fig, ax = plt.subplots(figsize=(size[0]/100, size[1]/100), dpi=100)
+    # Create figure with specific size to ensure under 512x512
+    fig, ax = plt.subplots(figsize=(4.8, 4.8), dpi=80)  # Adjusted for smaller output
     
     # Create custom colormap (Red-White-Green)
+    import matplotlib.colors
     colors = ['#FF0000', '#FFFFFF', '#00FF00']  # Red, White, Green
     n_bins = 100
     cmap = matplotlib.colors.LinearSegmentedColormap.from_list('excel', colors, N=n_bins)
@@ -60,8 +61,8 @@ def create_excel_style_heatmap(corr_matrix, filename='heatmap.png', size=(500, 5
     # Set ticks and labels
     ax.set_xticks(range(len(corr_matrix.columns)))
     ax.set_yticks(range(len(corr_matrix.index)))
-    ax.set_xticklabels(corr_matrix.columns, rotation=45, ha='right', fontsize=10)
-    ax.set_yticklabels(corr_matrix.index, fontsize=10)
+    ax.set_xticklabels(corr_matrix.columns, rotation=45, ha='right', fontsize=9)
+    ax.set_yticklabels(corr_matrix.index, fontsize=9)
     
     # Add correlation values as text
     for i in range(len(corr_matrix.index)):
@@ -70,7 +71,7 @@ def create_excel_style_heatmap(corr_matrix, filename='heatmap.png', size=(500, 5
             # Choose text color based on background
             text_color = 'white' if abs(value) > 0.5 else 'black'
             ax.text(j, i, f'{value:.3f}', ha='center', va='center', 
-                   color=text_color, fontweight='bold', fontsize=9)
+                   color=text_color, fontweight='bold', fontsize=8)
     
     # Add colorbar
     cbar = plt.colorbar(im, ax=ax, shrink=0.8)
@@ -78,15 +79,28 @@ def create_excel_style_heatmap(corr_matrix, filename='heatmap.png', size=(500, 5
     
     # Set title
     ax.set_title('Supply Chain Metrics Correlation Matrix\n(Excel Red-White-Green Style)', 
-                fontsize=12, fontweight='bold', pad=20)
+                fontsize=11, fontweight='bold', pad=15)
     
-    # Adjust layout and save
+    # Adjust layout and save with controlled parameters
     plt.tight_layout()
-    plt.savefig(filename, dpi=100, bbox_inches='tight', facecolor='white')
+    plt.savefig(filename, dpi=80, bbox_inches='tight', facecolor='white', pad_inches=0.1)
     plt.close()
     
-    # Verify image dimensions
+    # Verify and resize if needed
     img = Image.open(filename)
+    print(f"Initial heatmap dimensions: {img.size[0]}x{img.size[1]} pixels")
+    
+    # Ensure dimensions are under 512x512
+    if img.size[0] > 512 or img.size[1] > 512:
+        print("Resizing to meet requirements...")
+        max_size = 500
+        ratio = min(max_size/img.size[0], max_size/img.size[1])
+        new_size = (int(img.size[0] * ratio), int(img.size[1] * ratio))
+        img_resized = img.resize(new_size, Image.Resampling.LANCZOS)
+        img_resized.save(filename)
+        print(f"Resized to: {img_resized.size[0]}x{img_resized.size[1]} pixels")
+        return img_resized.size
+    
     print(f"Heatmap saved as {filename} with dimensions: {img.size}")
     return img.size
 
@@ -103,16 +117,22 @@ def main():
     print("Saving correlation matrix to correlation.csv...")
     corr_matrix.to_csv('correlation.csv')
     
-    # Create Excel-style heatmap
+    # Create Excel-style heatmap with size control
     print("Creating Excel-style heatmap...")
-    import matplotlib
-    import matplotlib.colors
-    
-    dimensions = create_excel_style_heatmap(corr_matrix, 'heatmap.png', (500, 500))
+    dimensions = create_excel_style_heatmap(corr_matrix, 'heatmap.png')
     
     # Save sample data
     print("Saving sample data...")
     df.to_csv('sample_supply_chain_data.csv', index=False)
+    
+    # Final verification
+    final_img = Image.open('heatmap.png')
+    print(f"Final heatmap dimensions: {final_img.size[0]}x{final_img.size[1]} pixels")
+    
+    if final_img.size[0] <= 512 and final_img.size[1] <= 512:
+        print("✅ Image size is within requirements!")
+    else:
+        print("❌ Image is still too large - manual resize needed")
     
     print(f"\nFiles generated successfully!")
     print(f"- correlation.csv: {corr_matrix.shape[0]}x{corr_matrix.shape[1]} correlation matrix")
